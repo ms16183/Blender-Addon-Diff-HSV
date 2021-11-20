@@ -12,7 +12,7 @@ bl_info = {
     'name': 'Blender Addon Color Palette',
     'author': 'ms16183',
     'version': (1, 0),
-    'blender': (2, 83, 12),
+    'blender': (2, 89, 5),
     'location': '3DViewport > Sidebar',
     'description': 'Color Palette UI',
     'warning': '',
@@ -47,6 +47,54 @@ class ColorPalette_MT_NopMenu(bpy.types.Menu):
         layout.operator(ColorPalette_OT_Nop.bl_idname, text='Square')
 
 
+# 0~1 -> 0~1
+def rgb2hsv(R, G, B):
+    maxval = max(R, G, B)
+    minval = min(R, G, B)
+    H = maxval - minval
+    if H > 0.0:
+        if maxval == R:
+            H = (G - B) / H
+            if H < 0.0:
+                H += 6.0
+        elif maxval == G:
+            H = 2.0 + (B - R) / H
+        else:
+            H = 4.0 + (R - G) / H
+    H /= 6.0
+    S = (maxval - minval)
+    if maxval != 0.0:
+        S /= maxval
+    V = maxval
+    return H, S, V
+
+
+# 0~1 -> 0~1
+def hsv2rgb(H, S, V):
+    R = G = B = V
+    if S > 0.0:
+        H *= 6.0
+        i = int(H)
+        F = H - float(i)
+        if i == 0:
+            G *= 1 - S * (1-F)
+            B *= 1 - S
+        if i == 1:
+            R *= 1 - S * F
+            B *= 1 - S
+        if i == 2:
+            R *= 1 - S
+            B *= 1 - S * (1-F)
+        if i == 3:
+            R *= 1 - S
+            G *= 1 - S * F
+        if i == 4:
+            R *= 1 - S * (1-F)
+            G *= 1 - S
+        if i == 5:
+            G *= 1 - S
+            B *= 1 - S * F
+    return R, G, B
 
 # カスタムパネル
 class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
@@ -57,22 +105,16 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
     bl_category = 'Color Palette'        # パネルを登録するタブ名
     #bl_context = 'objectmode'           # パネルを表示するコンテキスト
 
-    # パレット生成
-    pal = bpy.data.palettes.get("Addon Color Palette")
-    pal2 = bpy.data.palettes.get("Addon Color Palette2")
-    if pal is None:
-        pal = bpy.data.palettes.new("Addon Color Palette")
-    if pal2 is None:
-        pal2 = bpy.data.palettes.new("Addon Color Palette2")
-
-    ts = bpy.context.tool_settings   
-    ts.image_paint.palette = pal
-
     # カラー変更時にパレットの色を生成する
     def generate_palette(self, context):
-        # パレット取得
-        ts = context.tool_settings
-        pal = ts.image_paint.palette
+        # パレットネーム
+        palette_name = "AddonColorPalette"
+
+        # パレット生成
+        pal = bpy.data.palettes.get(palette_name)
+        if pal is None:
+            pal = bpy.data.palettes.new(palette_name)
+
         if pal:
             # パレットの色をすべてクリア
             pal.colors.clear()
@@ -82,32 +124,15 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
                 # カラーホイールのRGBを取得
                 R, G, B = self.colorpalette_color
                 # RGB(0~1) -> HSV(0~1)
-                maxval = max(R, G, B)
-                minval = min(R, G, B)
-                H = maxval - minval
-                if H > 0.0:
-                    if maxval == R:
-                        H = (G - B) / H
-                        if H < 0.0:
-                            H += 6.0
-                    elif maxval == G:
-                        H = 2.0 + (B - R) / H
-                    else:
-                        H = 4.0 + (R - G) / H
-                H /= 6.0
-                S = (maxval - minval)
-                if maxval != 0.0:
-                    S /= maxval
-                V = maxval
+                H, S, V = rgb2hsv(R, G, B)
 
                 # HSV(0~1) -> H(0~360), SV(0~100)
                 H *= 360
                 S *= 100
                 V *= 100
 
-                # ずらす値を取得
-                diff_H, diff_S, diff_V = self.colorpalette_diff_hsv
                 # ずらす
+                diff_H, diff_S, diff_V = self.colorpalette_diff_hsv
                 H += diff_H * i
                 S += diff_S * i
                 V += diff_V * i
@@ -118,35 +143,14 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
                 V /= 100
 
                 # HSV(0~1) -> RGB(0~1)
-                R = G = B = V
-                if S > 0.0:
-                    H *= 6.0
-                    i = int(H)
-                    F = H - float(i)
-                    if i == 0:
-                        G *= 1 - S * (1-F)
-                        B *= 1 - S
-                    if i == 1:
-                        R *= 1 - S * F
-                        B *= 1 - S
-                    if i == 2:
-                        R *= 1 - S
-                        B *= 1 - S * (1-F)
-                    if i == 3:
-                        R *= 1 - S
-                        G *= 1 - S * F
-                    if i == 4:
-                        R *= 1 - S * (1-F)
-                        G *= 1 - S
-                    if i == 5:
-                        G *= 1 - S
-                        B *- 1 - S * F
+                R, G, B = hsv2rgb(H, S, V)
 
-                # パレット作成
+                # パレットカラー作成
                 color = pal.colors.new()
                 color.color = (R, G, B)
                 color.weight = 1.0
                 pal.colors.active = color
+        context.tool_settings.image_paint.palette = pal
         return
 
     # プロパティ生成
@@ -163,7 +167,7 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
     scene.colorpalette_diff_hsv = IntVectorProperty(
         name='Diff HSV',
         description='int vector',
-        default=(0, 0, 0),
+        default=(12, 0, 3),
         min=-180,
         max=180,
         update=generate_palette,
@@ -173,7 +177,7 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
         description='int',
         default=5,
         min=1,
-        max=16,
+        max=32,
         update=generate_palette,
     )
     scene.colorpalette_hermony_type = EnumProperty(
@@ -219,10 +223,11 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
 
         # パレットを追加
         box.label(text='Palette:')
-        ts = context.tool_settings
-        if ts.image_paint.palette:
+        if context.tool_settings.image_paint.palette:
+            # パレットカラー数
             box.prop(scene, 'colorpalette_number_of_generate_color', text='num')
-            box.template_palette(ts.image_paint, 'palette', color=True)
+            # パレット
+            box.template_palette(context.tool_settings.image_paint, 'palette', color=True)
 
         # セパレータを追加
         layout.separator()
