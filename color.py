@@ -1,4 +1,5 @@
 import bpy
+
 from bpy.props import (
     IntProperty,
     FloatProperty,
@@ -12,7 +13,7 @@ bl_info = {
     'name': 'Blender Addon Color Palette',
     'author': 'ms16183',
     'version': (1, 0),
-    'blender': (2, 89, 5),
+    'blender': (2, 93, 5),
     'location': '3DViewport > Sidebar',
     'description': 'Color Palette UI',
     'warning': '',
@@ -34,6 +35,7 @@ class ColorPalette_OT_Nop(bpy.types.Operator):
         return {'FINISHED'}
 
 
+'''
 class ColorPalette_MT_NopMenu(bpy.types.Menu):
 
     bl_idname = 'ColorPalette_MT_NopMenu'
@@ -45,6 +47,8 @@ class ColorPalette_MT_NopMenu(bpy.types.Menu):
         layout.operator(ColorPalette_OT_Nop.bl_idname, text='Analogous')
         layout.operator(ColorPalette_OT_Nop.bl_idname, text='Triad')
         layout.operator(ColorPalette_OT_Nop.bl_idname, text='Square')
+
+'''
 
 
 # 0~1 -> 0~1
@@ -96,32 +100,29 @@ def hsv2rgb(H, S, V):
             B *= 1 - S * F
     return R, G, B
 
-# カスタムパネル
+
 class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
 
-    bl_label = 'Color Palette'         # パネルのヘッダに表示される文字列
-    bl_space_type = 'VIEW_3D'           # パネルを登録するスペース
-    bl_region_type = 'UI'               # パネルを登録するリージョン
-    bl_category = 'Color Palette'        # パネルを登録するタブ名
-    #bl_context = 'objectmode'           # パネルを表示するコンテキスト
+    bl_label = 'Color Palette'
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'Color Palette'
+    #bl_context = 'objectmode'
 
-    # カラー変更時にパレットの色を生成する
+    # Generate colors when updates.
     def generate_palette(self, context):
-        # パレットネーム
+        # Generate a palette.
         palette_name = "AddonColorPalette"
-
-        # パレット生成
         pal = bpy.data.palettes.get(palette_name)
         if pal is None:
             pal = bpy.data.palettes.new(palette_name)
 
         if pal:
-            # パレットの色をすべてクリア
+            # Clear all colors on the palette.
             pal.colors.clear()
             
-            # TODO: RGB->HSV等は関数として処理
             for i in range(self.colorpalette_number_of_generate_color):
-                # カラーホイールのRGBを取得
+                # Get color wheel color.
                 R, G, B = self.colorpalette_color
                 # RGB(0~1) -> HSV(0~1)
                 H, S, V = rgb2hsv(R, G, B)
@@ -131,7 +132,7 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
                 S *= 100
                 V *= 100
 
-                # ずらす
+                # Add offset HSV for HSV.
                 diff_H, diff_S, diff_V = self.colorpalette_diff_hsv
                 H += diff_H * i
                 S += diff_S * i
@@ -145,15 +146,17 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
                 # HSV(0~1) -> RGB(0~1)
                 R, G, B = hsv2rgb(H, S, V)
 
-                # パレットカラー作成
+                # Generate colors on the palette.
                 color = pal.colors.new()
                 color.color = (R, G, B)
                 color.weight = 1.0
                 pal.colors.active = color
+
         context.tool_settings.image_paint.palette = pal
         return
 
-    # プロパティ生成
+
+    # Properties
     scene = bpy.types.Scene
     scene.colorpalette_color = FloatVectorProperty(
         name='',
@@ -177,9 +180,10 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
         description='int',
         default=5,
         min=1,
-        max=32,
+        max=64,
         update=generate_palette,
     )
+    '''
     scene.colorpalette_hermony_type = EnumProperty(
         name='',
         description='enum',
@@ -190,62 +194,56 @@ class VIEW3D_PT_ColorPalatte(bpy.types.Panel):
         ],
         default='E_1'
     )
+    '''
 
-    # 本クラスの処理が実行可能かを判定する
+    # Check if methods of this class is executable.
     @classmethod
     def poll(cls, context):
         return True
 
-    # ヘッダーのカスタマイズ
+    # Custom header
     def draw_header(self, context):
         layout = self.layout
         layout.label(icon='COLOR')
 
-    # メニューの描画処理
+    # Menu
     def draw(self, context):
 
         layout = self.layout
         scene = context.scene
 
-        # カラーホイールを追加
+        # Color wheel
         layout.label(text='Base Color:')
         layout.template_color_picker(scene, 'colorpalette_color', value_slider=True)
         layout.prop(scene, 'colorpalette_color')
 
-        # セパレータを追加
         layout.separator()
 
         # Diff HSV
         box = layout.row().box()
 
-        # テキストボックスを追加
         box.prop(scene, 'colorpalette_diff_hsv', text='Diff HSV')
 
-        # パレットを追加
         box.label(text='Palette:')
         if context.tool_settings.image_paint.palette:
-            # パレットカラー数
             box.prop(scene, 'colorpalette_number_of_generate_color', text='num')
-            # パレット
             box.template_palette(context.tool_settings.image_paint, 'palette', color=True)
 
-        # セパレータを追加
         layout.separator()
 
 
-# プロパティを削除
 def clear_props():
     scene = bpy.types.Scene
     del scene.colorpalette_color
     del scene.colorpalette_diff_hsv
+    del scene.colorpalette_number_of_generate_color
 
 
 classes = [
-    ColorPalette_OT_Nop,
-    ColorPalette_MT_NopMenu,
+    #ColorPalette_OT_Nop,
+    #ColorPalette_MT_NopMenu,
     VIEW3D_PT_ColorPalatte,
 ]
-
 
 def register():
     for c in classes:
